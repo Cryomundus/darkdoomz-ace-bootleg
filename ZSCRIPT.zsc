@@ -1,0 +1,365 @@
+version "4.7"
+
+#include "ZSCRIPT.Beams.zsc"
+#include "ZSCRIPT.Mounts.zsc"
+
+class DarkDoomZ_Handler : StaticEventHandler
+{
+	Array<DDZ_LightBeamInfo> Beams;
+	Array<DDZ_MountPoint> Mounts;
+
+	Array<int> BaseLightLevels;
+	private transient CVar Mode, Preset, PreGain, PostGain, MinLight, SkyMode;
+	int OldMode, OldPreset, OldPreGain, OldPostGain, OldMinLight;
+	double OldSkyMode;
+
+	override void WorldLoaded(WorldEvent e)
+	{
+		Beams.Clear();
+		Mounts.Clear();
+
+		for (int i = 0; i < AllClasses.Size(); ++i)
+		{
+			if (AllClasses[i] is 'DDZ_LightBeamInfo' && !AllClasses[i].IsAbstract())
+			{
+				Beams.Push(DDZ_LightBeamInfo(new(AllClasses[i])));
+			}
+			if (AllClasses[i] is 'DDZ_MountPoint' && !AllClasses[i].IsAbstract())
+			{
+				Mounts.Push(DDZ_MountPoint(new(AllClasses[i])));
+			}
+		}
+
+		if (!ddz_lighting)
+		{
+			ThinkerIterator it = ThinkerIterator.Create("Lighting");
+			Lighting effect;
+			while (effect = Lighting(it.Next()))
+			{
+				effect.Destroy();
+			}
+		}
+
+		BaseLightLevels.Clear();
+		for (int i = 0; i < Level.Sectors.Size(); ++i)
+		{
+			BaseLightlevels.Push(Level.Sectors[i].LightLevel);
+		}
+
+		ChangeLighting();
+
+		if (e.isReopen)
+		{
+			let iterator = ThinkerIterator.Create('DarkDoomZ_Spotlight');
+			for (Thinker mo; (mo = iterator.Next());)
+			{
+				mo.Destroy();
+			}
+		}
+	}
+
+	override void PlayerSpawned(PlayerEvent e)
+	{
+		PlayerInfo player = players[e.PlayerNumber];
+		let cls = (class<Inventory>)(Actor.GetReplacement("DarkDoomZ_Flashlight"));
+		player.mo.GiveInventory(cls, 1);
+	}
+
+	override void UiTick()
+	{
+		EventHandler.SendNetworkEvent("UpdateLights");
+	}
+
+	override void NetworkProcess(ConsoleEvent e)
+	{
+		if (e.Name == "UpdateLights")
+		{
+			ChangeLighting();
+		}
+	}
+
+	void ChangeLighting()
+	{
+		if (!Mode) { Mode = CVar.GetCvar('ddz_mode'); }
+		if (!Preset) { Preset = CVar.GetCvar('ddz_preset'); }
+		if (!PreGain) { PreGain = CVar.GetCvar('ddz_pregain'); }
+		if (!PostGain) { PostGain = CVar.GetCvar('ddz_postgain'); }
+		if (!MinLight) { MinLight = CVar.GetCvar('ddz_minlight'); }
+		if (!SkyMode) { SkyMode = CVar.GetCvar('ddz_skymode'); }
+
+		bool changed = OldMode != Mode.GetInt() || OldPreset != Preset.GetInt() || OldPreGain != PreGain.GetInt() || OldPostGain != PostGain.GetInt() || OldMinLight != MinLight.GetInt() || OldSkyMode != Skymode.GetFloat();
+
+		if (changed)
+		{
+			int baseAdjustment = 32 * Preset.GetInt();
+
+			for (int i = 0; i < BaseLightLevels.Size(); ++i)
+			{
+				int baseLevel = BaseLightLevels[i];
+				baseLevel += PreGain.GetInt();
+
+				bool IsSky = level.Sectors[i].GetTexture(0) == skyflatnum || level.Sectors[i].GetTexture(1) == skyflatnum;
+
+				int finalAdjustment = baseAdjustment;
+				if(IsSky)
+				{
+					finalAdjustment = int(finalAdjustment * SkyMode.GetFloat());
+				}
+
+				// Link to graphing calculator depiction of different modes
+				// https://www.desmos.com/calculator/v1ni4wftcg
+				switch(Mode.GetInt())
+				{
+					case 1: //subtract raw light level (simple fade)
+						Level.Sectors[i].Lightlevel = baseLevel - finalAdjustment;
+						break;
+					case 2: //linear compression
+						Level.Sectors[i].Lightlevel = int(baseLevel * (1.0 - finalAdjustment / 256.0));
+						break;
+					case 3: //clamp max brightness level
+						Level.Sectors[i].Lightlevel = clamp(baseLevel, 0, 256 - finalAdjustment);
+						break;
+					case 4: //apply exponential gamma curve
+						Level.Sectors[i].Lightlevel = int((256 - (finalAdjustment ** (finalAdjustment / 256))) * (baseLevel / 256.0) ** (1 + (finalAdjustment / (33 - (finalAdjustment / 8)))));
+						break;
+					case 10: //DarkDoom Lite (fixed subtract mode)
+						Level.Sectors[i].Lightlevel = baseLevel - 96;
+						break;
+					case 11: //DarkDoom Classic (fixed subtract mode)
+						Level.Sectors[i].Lightlevel = baseLevel - 128;
+						break;
+					case 12: //DarkDoom Black (fixed subtract mode)
+						Level.Sectors[i].Lightlevel = baseLevel - 256;
+						break;
+					default: //disable
+						Level.Sectors[i].Lightlevel = baseLevel; //reset lightlevels
+						break;
+				}
+
+				Level.Sectors[i].Lightlevel += PostGain.GetInt();
+				Level.Sectors[i].Lightlevel = max(Level.Sectors[i].Lightlevel, MinLight.GetInt());
+			}
+		}
+
+		OldMode = Mode.GetInt();
+		OldPreset = Preset.GetInt();
+		OldPreGain = PreGain.GetInt();
+		OldPostGain = PostGain.GetInt();
+		OldMinLight = MinLight.GetInt();
+		OldSkyMode = SkyMode.GetFloat();
+	}
+}
+
+class DarkDoomZ_Flashlight : HDPickup
+{
+	private DarkDoomZ_Spotlight CreateBeam(DDZ_LightBeamInfo beam, DDZ_MountPoint mount, int type)
+	{
+		let light = DarkDoomZ_Spotlight(Spawn("DarkDoomZ_Spotlight", owner.pos, false));
+		light.FollowTarget = owner;
+		[light.Args[DynamicLight.LIGHT_RED], light.Args[DynamicLight.LIGHT_GREEN], light.Args[DynamicLight.LIGHT_BLUE]] = beam.GetColor(type == 2);
+		[light.SpotInnerAngle, light.SpotOuterAngle, light.Args[DynamicLight.LIGHT_INTENSITY]] = beam.GetRadius(type);
+		light.angle = owner.angle;
+		light.pitch = owner.pitch;
+		[light.Spring, light.Damping, light.Inertia, light.OffsetAngle, light.OffsetZ] = mount.GetMountInfo();
+		return light;
+	}
+
+	override void DoEffect()
+	{
+		Super.DoEffect();
+
+		if (!Quality) { Quality = CVar.GetCvar("ddz_fl_quality"); }
+		if (!Beam) { Beam = CVar.GetCvar("ddz_fl_type"); }
+		if (!Mount) { Mount = CVar.GetCvar("ddz_fl_pos"); }
+		if (!Handler) { Handler = DarkDoomZ_Handler(StaticEventHandler.Find('DarkDoomZ_Handler')); }
+
+		int qual = Quality.GetInt();
+		int beamIndex = min(Beam.GetInt(), Handler.Beams.Size() - 1);
+		int mountIndex = min(Mount.GetInt(), Handler.Mounts.Size() - 1);
+
+		if (Active)
+		{
+			if (qual != OldQuality || beamIndex != OldBeam || mountIndex != OldMount)
+			{
+				if (InnerLight) { InnerLight.Destroy(); }
+				if (OuterLight) { OuterLight.Destroy(); }
+			}
+
+			if (!InnerLight)
+			{
+				InnerLight = CreateBeam(Handler.Beams[beamIndex], Handler.Mounts[mountIndex], qual == 1);
+			}
+
+			if (qual == 1 && !OuterLight)
+			{
+				OuterLight = CreateBeam(Handler.Beams[beamIndex], Handler.Mounts[mountIndex], 2);
+			}
+		}
+		else
+		{
+			if (InnerLight) { InnerLight.Destroy(); }
+			if (OuterLight) { OuterLight.Destroy(); }
+		}
+		
+		OldQuality = qual;
+		OldBeam = beamIndex;
+		OldMount = mountIndex;
+	}
+
+	private bool Active;
+
+	private transient CVar Quality, Beam, Mount;
+	private int OldQuality, OldBeam, OldMount;
+	private DarkDoomZ_Spotlight InnerLight, OuterLight;
+
+	private DarkDoomZ_Handler Handler;
+
+	// [Ace] These are for the mounts.
+	private double OffsetAngle, OffsetZ;
+	private int Inertia;
+	private double Spring, Damping;
+
+	Default
+	{
+		+INVENTORY.PERSISTENTPOWER;
+	}
+
+	States
+	{
+		Spawn:
+			ROCK A -1;
+			Stop;
+
+		Use:
+			TNT1 A 1 { invoker.ToggleActive(); }
+			Loop;
+	}
+
+	virtual void ToggleActive()
+	{
+		Active = !Active;
+		owner.A_StartSound("DarkDoomZ/Flashlight/Click", CHAN_AUTO, 0, 0.5);
+	}
+}
+
+class DarkDoomZ_Spotlight : DynamicLight
+{
+	override void Tick()
+	{
+		Super.Tick();
+		if (followTarget && followTarget.player)
+		{
+			if (Inertia == 0)
+			{
+				Inertia = 1;
+			}
+			targetpos = followTarget.Vec3Angle(
+				2 + (6 * abs(sin(OffsetAngle))),
+				followtarget.angle + OffsetAngle,
+				followtarget.player.viewz - followtarget.pos.z + OffsetZ,
+				false);
+			vel.x += DampedSpring(pos.x, targetpos.x, vel.x, 1, 1);
+			vel.y += DampedSpring(pos.y, targetpos.y, vel.y, 1, 1);
+			vel.z += DampedSpring(pos.z, targetpos.z, vel.z, 1, 1);
+			vela  += DampedSpring(angle, followTarget.angle, vela, Spring, Damping);
+			velp  += DampedSpring(pitch, followTarget.pitch, velp, Spring, Damping);
+			SetOrigin(pos + vel, true);
+			A_SetAngle(angle + (vela / Inertia), true);
+			A_SetPitch(pitch + (velp / Inertia), true);
+		}
+	}
+
+	double DampedSpring(double p, double r, double v, double k, double d)
+	{
+		return -(d * v) - (k * (p - r));
+	}
+
+	Actor FollowTarget;
+	double vela, velp;
+	double Spring, Damping;
+	double OffsetAngle, OffsetZ;
+	vector3 targetPos;
+	int Inertia;
+
+	Default
+	{
+		DynamicLight.Type "Point";
+		+DYNAMICLIGHT.ATTENUATE;
+		+DYNAMICLIGHT.SPOT
+	}
+}
+
+class DarkDoomZ_OptionMenu : OptionMenu
+{
+	override void Init(Menu parent, OptionMenuDescriptor desc)
+	{
+		Super.Init(parent, desc);
+		DontDim = true;
+		DontBlur = true;
+	}
+}
+
+class OptionMenuItemDDZFlashlightOption : OptionMenuItem
+{
+	DarkDoomZ_Handler mHandler;
+	CVar mCVar;
+
+	void Init(String label, Name command)
+	{
+		Super.Init(label, command);
+		mHandler = DarkDoomZ_Handler(StaticEventHandler.Find('DarkDoomZ_Handler'));
+		mCVar = CVar.FindCVar(mAction);
+	}
+
+	override int Draw(OptionMenuDescriptor desc, int y, int indent, bool selected)
+	{
+		drawLabel(indent, y, selected ? OptionMenuSettings.mFontColorSelection : OptionMenuSettings.mFontColor);
+
+		string text = "";
+		switch (mAction)
+		{
+			case 'ddz_fl_type': text = mHandler.Beams[min(mCVar.GetInt(), mHandler.Beams.Size() - 1)].GetName(); break;
+			case 'ddz_fl_pos': text = mHandler.Mounts[min(mCVar.GetInt(), mHandler.Mounts.Size() - 1)].GetName(); break;
+		}
+		if (text.Length() == 0)
+		{
+			text = "Unknown";
+		}
+		drawValue(indent, y, OptionMenuSettings.mFontColorValue, text);
+		return indent;
+	}
+
+	override bool MenuEvent (int mkey, bool fromcontroller)
+	{
+		int maxIndex = 0;
+		switch (mAction)
+		{
+			case 'ddz_fl_type': maxIndex = mHandler.Beams.Size() - 1; break;
+			case 'ddz_fl_pos': maxIndex = mHandler.Mounts.Size() - 1; break;
+		}
+
+		int selIndex = mCVar.GetInt();
+		if (mkey == Menu.MKEY_Left)
+		{
+			if (--selIndex < 0)
+			{
+				selIndex = maxIndex;
+			}
+		}
+		else if (mkey == Menu.MKEY_Right || mkey == Menu.MKEY_Enter)
+		{
+			if (++selIndex > maxIndex)
+			{
+				selIndex = 0;
+			}
+		}
+		else
+		{
+			return Super.MenuEvent(mkey, fromcontroller);
+		}
+		mCVar.SetInt(selIndex);
+		Menu.MenuSound("menu/change");
+		return true;
+	}
+}
+

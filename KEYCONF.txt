@@ -1,0 +1,4 @@
+AddKeySection "DarkDoomZ" "DarkDoomZ"
+AddMenuKey "Toggle Flashlight" ddz_toggleflashlight
+alias ddz_toggleflashlight "use DarkDoomZ_Flashlight"
+defaultbind "f" ddz_toggleflashlight
