@@ -118,7 +118,7 @@ class DarkDoomZ_Flashlight : HDWeapon
 	{
 		if (!silent && owner)
 		{
-			owner.A_StartSound("DarkDoomZ/Flashlight/Click", CHAN_AUTO, 0, 0.5);
+			owner.A_StartSound("DarkDoomZ/Flashlight/Click", CHAN_AUTO);
 		}
 
 		if (WeaponStatus[FLProp_Battery] > 0)
@@ -144,7 +144,7 @@ class DarkDoomZ_Flashlight : HDWeapon
 	{
 		if (!silent && owner)
 		{
-			owner.A_StartSound("DarkDoomZ/Flashlight/Click", CHAN_AUTO, 0, 0.5);
+			owner.A_StartSound("DarkDoomZ/Flashlight/Click", CHAN_AUTO);
 		}
 		Active = false;
 		if (InnerLight) { InnerLight.Destroy(); }

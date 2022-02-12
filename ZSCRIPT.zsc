@@ -105,14 +105,14 @@ class DarkDoomZ_Handler : StaticEventHandler
 				bool IsSky = level.Sectors[i].GetTexture(0) == skyflatnum || level.Sectors[i].GetTexture(1) == skyflatnum;
 
 				int finalAdjustment = baseAdjustment;
-				if(IsSky)
+				if (IsSky)
 				{
 					finalAdjustment = int(finalAdjustment * SkyMode.GetFloat());
 				}
 
 				// Link to graphing calculator depiction of different modes
 				// https://www.desmos.com/calculator/v1ni4wftcg
-				switch(Mode.GetInt())
+				switch (Mode.GetInt())
 				{
 					case 1: //subtract raw light level (simple fade)
 						Level.Sectors[i].Lightlevel = baseLevel - finalAdjustment;
