@@ -59,6 +59,15 @@ class DarkDoomZ_Handler : StaticEventHandler
 			}
 		}
 	}
+
+	override void WorldThingSpawned(WorldEvent e)
+	{
+		let bat = HDBattery(e.Thing);
+		if (bat)
+		{
+			bat.ItemsThatUseThis.Push("DarkDoomZ_Flashlight");
+		}
+	}
 	
 	override void UiTick()
 	{
@@ -182,6 +191,22 @@ class DarkDoomZ_Spotlight : DynamicLight
 			A_SetAngle(angle + (vela / Inertia), true);
 			A_SetPitch(pitch + (velp / Inertia), true);
 		}
+
+		if (OldIntensity > 0 && UnflickerTimer-- == 0)
+		{
+			Args[DynamicLight.LIGHT_INTENSITY] = OldIntensity;
+			OldIntensity = 0;
+		}
+	}
+
+	void Flicker(int offDuration, double minFac, double maxFac)
+	{
+		if (OldIntensity == 0)
+		{
+			OldIntensity = Args[DynamicLight.LIGHT_INTENSITY];
+			Args[DynamicLight.LIGHT_INTENSITY] = int(Args[DynamicLight.LIGHT_INTENSITY] * frandom(minFac, maxFac));
+			UnflickerTimer = offDuration;
+		}
 	}
 
 	double DampedSpring(double p, double r, double v, double k, double d)
@@ -189,12 +214,11 @@ class DarkDoomZ_Spotlight : DynamicLight
 		return -(d * v) - (k * (p - r));
 	}
 
-	Actor FollowTarget;
-	double vela, velp;
-	double Spring, Damping;
-	double OffsetAngle, OffsetZ;
-	vector3 targetPos;
-	int Inertia;
+	private int OldIntensity, UnflickerTimer;
+	private Actor FollowTarget;
+	private vector3 targetPos;
+	private double vela, velp, Spring, Damping, OffsetAngle, OffsetZ;
+	private int Inertia;
 
 	Default
 	{

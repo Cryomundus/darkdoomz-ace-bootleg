@@ -81,6 +81,7 @@ class DarkDoomZ_Flashlight : HDWeapon
 			DeactivateLight(true);
 			ActivateLight(true);	
 		}
+
 		if (!owner)
 		{
 			DeactivateLight(true);
@@ -91,6 +92,16 @@ class DarkDoomZ_Flashlight : HDWeapon
 			{
 				WeaponStatus[FLProp_Battery]--;
 				WeaponStatus[FLProp_DrainTicker] = 0;
+			}
+
+			if (WeaponStatus[FLProp_Battery] < 6 && random(0, 1000) < 3.0 ** (6 - WeaponStatus[FLProp_Battery]))
+			{
+				int duration = (6 - WeaponStatus[FLProp_Battery]) * random(1, 4);
+				double minFac = WeaponStatus[FLProp_Battery] / 10.0;
+				double maxFac = minFac * 1.6;
+
+				if (InnerLight) { InnerLight.Flicker(duration, minFac, maxFac); }
+				if (OuterLight) { OuterLight.Flicker(duration, minFac, maxFac); }
 			}
 		}
 		else
@@ -105,7 +116,7 @@ class DarkDoomZ_Flashlight : HDWeapon
 
 	void ActivateLight(bool silent = false)
 	{
-		if (!silent)
+		if (!silent && owner)
 		{
 			owner.A_StartSound("DarkDoomZ/Flashlight/Click", CHAN_AUTO, 0, 0.5);
 		}
@@ -131,11 +142,11 @@ class DarkDoomZ_Flashlight : HDWeapon
 
 	void DeactivateLight(bool silent = false)
 	{
-		Active = false;
-		if (!silent)
+		if (!silent && owner)
 		{
 			owner.A_StartSound("DarkDoomZ/Flashlight/Click", CHAN_AUTO, 0, 0.5);
 		}
+		Active = false;
 		if (InnerLight) { InnerLight.Destroy(); }
 		if (OuterLight) { OuterLight.Destroy(); }
 	}
