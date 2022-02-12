@@ -48,7 +48,7 @@ class DarkDoomZ_Handler : StaticEventHandler
 			BaseLightlevels.Push(Level.Sectors[i].LightLevel);
 		}
 
-		ChangeLighting();
+		ChangeLighting(true);
 
 		if (e.isReopen)
 		{
@@ -82,7 +82,7 @@ class DarkDoomZ_Handler : StaticEventHandler
 		}
 	}
 
-	void ChangeLighting()
+	void ChangeLighting(bool force = false)
 	{
 		if (!Mode) { Mode = CVar.GetCvar('ddz_mode'); }
 		if (!Preset) { Preset = CVar.GetCvar('ddz_preset'); }
@@ -91,7 +91,7 @@ class DarkDoomZ_Handler : StaticEventHandler
 		if (!MinLight) { MinLight = CVar.GetCvar('ddz_minlight'); }
 		if (!SkyMode) { SkyMode = CVar.GetCvar('ddz_skymode'); }
 
-		bool changed = OldMode != Mode.GetInt() || OldPreset != Preset.GetInt() || OldPreGain != PreGain.GetInt() || OldPostGain != PostGain.GetInt() || OldMinLight != MinLight.GetInt() || OldSkyMode != Skymode.GetFloat();
+		bool changed = force || OldMode != Mode.GetInt() || OldPreset != Preset.GetInt() || OldPreGain != PreGain.GetInt() || OldPostGain != PostGain.GetInt() || OldMinLight != MinLight.GetInt() || OldSkyMode != Skymode.GetFloat();
 
 		if (changed)
 		{
