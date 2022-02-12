@@ -2,6 +2,8 @@ version "4.7"
 
 #include "ZSCRIPT.Beams.zsc"
 #include "ZSCRIPT.Mounts.zsc"
+#include "ZSCRIPT.Flashlight.zsc"
+#include "ZSCRIPT.MenuStuff.zsc"
 
 class DarkDoomZ_Handler : StaticEventHandler
 {
@@ -57,14 +59,7 @@ class DarkDoomZ_Handler : StaticEventHandler
 			}
 		}
 	}
-
-	override void PlayerSpawned(PlayerEvent e)
-	{
-		PlayerInfo player = players[e.PlayerNumber];
-		let cls = (class<Inventory>)(Actor.GetReplacement("DarkDoomZ_Flashlight"));
-		player.mo.GiveInventory(cls, 1);
-	}
-
+	
 	override void UiTick()
 	{
 		EventHandler.SendNetworkEvent("UpdateLights");
@@ -150,100 +145,20 @@ class DarkDoomZ_Handler : StaticEventHandler
 	}
 }
 
-class DarkDoomZ_Flashlight : HDPickup
+class DarkDoomZ_Spotlight : DynamicLight
 {
-	private DarkDoomZ_Spotlight CreateBeam(DDZ_LightBeamInfo beam, DDZ_MountPoint mount, int type)
+	static DarkDoomZ_Spotlight CreateBeam(Actor other, DDZ_LightBeamInfo beam, DDZ_MountPoint mount, int type)
 	{
-		let light = DarkDoomZ_Spotlight(Spawn("DarkDoomZ_Spotlight", owner.pos, false));
-		light.FollowTarget = owner;
+		let light = DarkDoomZ_Spotlight(Spawn("DarkDoomZ_Spotlight", other.pos, false));
+		light.FollowTarget = other;
 		[light.Args[DynamicLight.LIGHT_RED], light.Args[DynamicLight.LIGHT_GREEN], light.Args[DynamicLight.LIGHT_BLUE]] = beam.GetColor(type == 2);
 		[light.SpotInnerAngle, light.SpotOuterAngle, light.Args[DynamicLight.LIGHT_INTENSITY]] = beam.GetRadius(type);
-		light.angle = owner.angle;
-		light.pitch = owner.pitch;
+		light.angle = other.angle;
+		light.pitch = other.pitch;
 		[light.Spring, light.Damping, light.Inertia, light.OffsetAngle, light.OffsetZ] = mount.GetMountInfo();
 		return light;
 	}
 
-	override void DoEffect()
-	{
-		Super.DoEffect();
-
-		if (!Quality) { Quality = CVar.GetCvar("ddz_fl_quality"); }
-		if (!Beam) { Beam = CVar.GetCvar("ddz_fl_type"); }
-		if (!Mount) { Mount = CVar.GetCvar("ddz_fl_pos"); }
-		if (!Handler) { Handler = DarkDoomZ_Handler(StaticEventHandler.Find('DarkDoomZ_Handler')); }
-
-		int qual = Quality.GetInt();
-		int beamIndex = min(Beam.GetInt(), Handler.Beams.Size() - 1);
-		int mountIndex = min(Mount.GetInt(), Handler.Mounts.Size() - 1);
-
-		if (Active)
-		{
-			if (qual != OldQuality || beamIndex != OldBeam || mountIndex != OldMount)
-			{
-				if (InnerLight) { InnerLight.Destroy(); }
-				if (OuterLight) { OuterLight.Destroy(); }
-			}
-
-			if (!InnerLight)
-			{
-				InnerLight = CreateBeam(Handler.Beams[beamIndex], Handler.Mounts[mountIndex], qual == 1);
-			}
-
-			if (qual == 1 && !OuterLight)
-			{
-				OuterLight = CreateBeam(Handler.Beams[beamIndex], Handler.Mounts[mountIndex], 2);
-			}
-		}
-		else
-		{
-			if (InnerLight) { InnerLight.Destroy(); }
-			if (OuterLight) { OuterLight.Destroy(); }
-		}
-		
-		OldQuality = qual;
-		OldBeam = beamIndex;
-		OldMount = mountIndex;
-	}
-
-	private bool Active;
-
-	private transient CVar Quality, Beam, Mount;
-	private int OldQuality, OldBeam, OldMount;
-	private DarkDoomZ_Spotlight InnerLight, OuterLight;
-
-	private DarkDoomZ_Handler Handler;
-
-	// [Ace] These are for the mounts.
-	private double OffsetAngle, OffsetZ;
-	private int Inertia;
-	private double Spring, Damping;
-
-	Default
-	{
-		+INVENTORY.PERSISTENTPOWER;
-	}
-
-	States
-	{
-		Spawn:
-			ROCK A -1;
-			Stop;
-
-		Use:
-			TNT1 A 1 { invoker.ToggleActive(); }
-			Loop;
-	}
-
-	virtual void ToggleActive()
-	{
-		Active = !Active;
-		owner.A_StartSound("DarkDoomZ/Flashlight/Click", CHAN_AUTO, 0, 0.5);
-	}
-}
-
-class DarkDoomZ_Spotlight : DynamicLight
-{
 	override void Tick()
 	{
 		Super.Tick();
@@ -261,8 +176,8 @@ class DarkDoomZ_Spotlight : DynamicLight
 			vel.x += DampedSpring(pos.x, targetpos.x, vel.x, 1, 1);
 			vel.y += DampedSpring(pos.y, targetpos.y, vel.y, 1, 1);
 			vel.z += DampedSpring(pos.z, targetpos.z, vel.z, 1, 1);
-			vela  += DampedSpring(angle, followTarget.angle, vela, Spring, Damping);
-			velp  += DampedSpring(pitch, followTarget.pitch, velp, Spring, Damping);
+			vela += DampedSpring(angle, followTarget.angle, vela, Spring, Damping);
+			velp += DampedSpring(pitch, followTarget.pitch, velp, Spring, Damping);
 			SetOrigin(pos + vel, true);
 			A_SetAngle(angle + (vela / Inertia), true);
 			A_SetPitch(pitch + (velp / Inertia), true);
@@ -288,78 +203,3 @@ class DarkDoomZ_Spotlight : DynamicLight
 		+DYNAMICLIGHT.SPOT
 	}
 }
-
-class DarkDoomZ_OptionMenu : OptionMenu
-{
-	override void Init(Menu parent, OptionMenuDescriptor desc)
-	{
-		Super.Init(parent, desc);
-		DontDim = true;
-		DontBlur = true;
-	}
-}
-
-class OptionMenuItemDDZFlashlightOption : OptionMenuItem
-{
-	DarkDoomZ_Handler mHandler;
-	CVar mCVar;
-
-	void Init(String label, Name command)
-	{
-		Super.Init(label, command);
-		mHandler = DarkDoomZ_Handler(StaticEventHandler.Find('DarkDoomZ_Handler'));
-		mCVar = CVar.FindCVar(mAction);
-	}
-
-	override int Draw(OptionMenuDescriptor desc, int y, int indent, bool selected)
-	{
-		drawLabel(indent, y, selected ? OptionMenuSettings.mFontColorSelection : OptionMenuSettings.mFontColor);
-
-		string text = "";
-		switch (mAction)
-		{
-			case 'ddz_fl_type': text = mHandler.Beams[min(mCVar.GetInt(), mHandler.Beams.Size() - 1)].GetName(); break;
-			case 'ddz_fl_pos': text = mHandler.Mounts[min(mCVar.GetInt(), mHandler.Mounts.Size() - 1)].GetName(); break;
-		}
-		if (text.Length() == 0)
-		{
-			text = "Unknown";
-		}
-		drawValue(indent, y, OptionMenuSettings.mFontColorValue, text);
-		return indent;
-	}
-
-	override bool MenuEvent (int mkey, bool fromcontroller)
-	{
-		int maxIndex = 0;
-		switch (mAction)
-		{
-			case 'ddz_fl_type': maxIndex = mHandler.Beams.Size() - 1; break;
-			case 'ddz_fl_pos': maxIndex = mHandler.Mounts.Size() - 1; break;
-		}
-
-		int selIndex = mCVar.GetInt();
-		if (mkey == Menu.MKEY_Left)
-		{
-			if (--selIndex < 0)
-			{
-				selIndex = maxIndex;
-			}
-		}
-		else if (mkey == Menu.MKEY_Right || mkey == Menu.MKEY_Enter)
-		{
-			if (++selIndex > maxIndex)
-			{
-				selIndex = 0;
-			}
-		}
-		else
-		{
-			return Super.MenuEvent(mkey, fromcontroller);
-		}
-		mCVar.SetInt(selIndex);
-		Menu.MenuSound("menu/change");
-		return true;
-	}
-}
-
