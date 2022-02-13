@@ -10,13 +10,13 @@ class DarkDoomZ_OptionMenu : OptionMenu
 
 class OptionMenuItemDDZFlashlightOption : OptionMenuItem
 {
-	DarkDoomZ_Handler mHandler;
+	DarkDoomZ_DataHandler mHandler;
 	CVar mCVar;
 
 	void Init(String label, Name command)
 	{
 		Super.Init(label, command);
-		mHandler = DarkDoomZ_Handler(StaticEventHandler.Find('DarkDoomZ_Handler'));
+		mHandler = DarkDoomZ_DataHandler(StaticEventHandler.Find('DarkDoomZ_DataHandler'));
 		mCVar = CVar.FindCVar(mAction);
 	}
 

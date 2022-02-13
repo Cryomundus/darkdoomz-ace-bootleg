@@ -65,7 +65,7 @@ class DarkDoomZ_Flashlight : HDWeapon
 		if (!Quality) { Quality = CVar.GetCvar("ddz_fl_quality"); }
 		if (!Beam) { Beam = CVar.GetCvar("ddz_fl_type"); }
 		if (!Mount) { Mount = CVar.GetCvar("ddz_fl_pos"); }
-		if (!Handler) { Handler = DarkDoomZ_Handler(StaticEventHandler.Find('DarkDoomZ_Handler')); }
+		if (!Handler) { Handler = DarkDoomZ_DataHandler(StaticEventHandler.Find('DarkDoomZ_DataHandler')); }
 
 		if (!Active)
 		{
@@ -163,7 +163,7 @@ class DarkDoomZ_Flashlight : HDWeapon
 	private transient CVar Quality, Beam, Mount;
 	private int OldQuality, OldBeam, OldMount;
 	private DarkDoomZ_Spotlight InnerLight, OuterLight;
-	private DarkDoomZ_Handler Handler;
+	private DarkDoomZ_DataHandler Handler;
 
 	Default
 	{

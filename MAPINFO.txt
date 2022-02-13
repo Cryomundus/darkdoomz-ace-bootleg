@@ -1,4 +1,4 @@
 GameInfo
 {
-	AddEventHandlers = "DarkDoomZ_Handler"
+	AddEventHandlers = "DarkDoomZ_LightHandler", "DarkDoomZ_DataHandler"
 }

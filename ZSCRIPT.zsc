@@ -5,15 +5,10 @@ version "4.7"
 #include "ZSCRIPT.Flashlight.zsc"
 #include "ZSCRIPT.MenuStuff.zsc"
 
-class DarkDoomZ_Handler : StaticEventHandler
+class DarkDoomZ_DataHandler : StaticEventHandler
 {
 	Array<DDZ_LightBeamInfo> Beams;
 	Array<DDZ_MountPoint> Mounts;
-
-	Array<int> BaseLightLevels;
-	private transient CVar Mode, Preset, PreGain, PostGain, MinLight, SkyMode;
-	int OldMode, OldPreset, OldPreGain, OldPostGain, OldMinLight;
-	double OldSkyMode;
 
 	override void WorldLoaded(WorldEvent e)
 	{
@@ -31,7 +26,18 @@ class DarkDoomZ_Handler : StaticEventHandler
 				Mounts.Push(DDZ_MountPoint(new(AllClasses[i])));
 			}
 		}
+	}
+}
 
+class DarkDoomZ_LightHandler : EventHandler
+{
+	Array<int> BaseLightLevels;
+	private transient CVar Mode, Preset, PreGain, PostGain, MinLight, SkyMode;
+	int OldMode, OldPreset, OldPreGain, OldPostGain, OldMinLight;
+	double OldSkyMode;
+
+	override void WorldLoaded(WorldEvent e)
+	{
 		if (!ddz_lighting)
 		{
 			ThinkerIterator it = ThinkerIterator.Create("Lighting");
@@ -48,7 +54,7 @@ class DarkDoomZ_Handler : StaticEventHandler
 			BaseLightlevels.Push(Level.Sectors[i].LightLevel);
 		}
 
-		ChangeLighting(true);
+		ChangeLighting();
 
 		if (e.isReopen)
 		{
@@ -82,7 +88,7 @@ class DarkDoomZ_Handler : StaticEventHandler
 		}
 	}
 
-	void ChangeLighting(bool force = false)
+	void ChangeLighting()
 	{
 		if (!Mode) { Mode = CVar.GetCvar('ddz_mode'); }
 		if (!Preset) { Preset = CVar.GetCvar('ddz_preset'); }
@@ -91,7 +97,7 @@ class DarkDoomZ_Handler : StaticEventHandler
 		if (!MinLight) { MinLight = CVar.GetCvar('ddz_minlight'); }
 		if (!SkyMode) { SkyMode = CVar.GetCvar('ddz_skymode'); }
 
-		bool changed = force || OldMode != Mode.GetInt() || OldPreset != Preset.GetInt() || OldPreGain != PreGain.GetInt() || OldPostGain != PostGain.GetInt() || OldMinLight != MinLight.GetInt() || OldSkyMode != Skymode.GetFloat();
+		bool changed = OldMode != Mode.GetInt() || OldPreset != Preset.GetInt() || OldPreGain != PreGain.GetInt() || OldPostGain != PostGain.GetInt() || OldMinLight != MinLight.GetInt() || OldSkyMode != Skymode.GetFloat();
 
 		if (changed)
 		{
