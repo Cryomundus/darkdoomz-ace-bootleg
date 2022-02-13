@@ -179,7 +179,6 @@ class DarkDoomZ_Flashlight : HDWeapon
 		+INVENTORY.INVBAR
 		+WEAPON.WIMPY_WEAPON
 		-HDWEAPON.DROPTRANSLATION
-		Inventory.MaxAmount 5;
 		Inventory.Icon "DDFLA0";
 		Inventory.PickupSound "weapons/pocket";
 		Inventory.PickupMessage "You picked up a flashlight.";
