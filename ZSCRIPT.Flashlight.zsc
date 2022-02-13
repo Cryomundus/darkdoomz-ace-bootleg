@@ -157,6 +157,14 @@ class DarkDoomZ_Flashlight : HDWeapon
 		Super.OnDestroy();
 	}
 
+	override void Travelled()
+	{
+		if (Active)
+		{
+			ActivateLight(true);
+		}
+	}
+
 	private bool Active;
 	private int UseOffset;
 
