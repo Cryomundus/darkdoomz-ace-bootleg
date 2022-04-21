@@ -10,11 +10,8 @@ class DarkDoomZ_DataHandler : StaticEventHandler
 	Array<DDZ_LightBeamInfo> Beams;
 	Array<DDZ_MountPoint> Mounts;
 
-	override void WorldLoaded(WorldEvent e)
+	override void OnRegister()
 	{
-		Beams.Clear();
-		Mounts.Clear();
-
 		for (int i = 0; i < AllClasses.Size(); ++i)
 		{
 			if (AllClasses[i] is 'DDZ_LightBeamInfo' && !AllClasses[i].IsAbstract())
