@@ -87,6 +87,11 @@ class DarkDoomZ_LightHandler : EventHandler
 
 	void ChangeLighting()
 	{
+		if (level.MapName ~== "LOTSAGUN")
+		{
+			return;
+		}
+		
 		if (!Mode) { Mode = CVar.GetCvar('ddz_mode'); }
 		if (!Preset) { Preset = CVar.GetCvar('ddz_preset'); }
 		if (!PreGain) { PreGain = CVar.GetCvar('ddz_pregain'); }
